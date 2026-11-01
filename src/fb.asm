@@ -16,6 +16,10 @@ define(fb_bw_r, x19)
 define(fb_bh_r, x20)
 define(fb_bp_r, x21)
 define(fb_by_r, x22)
+define(fb_bo_r, x23)
+define(fb_be_r, x24)
+define(fb_bl_r, x25)
+define(fb_br_r, x26)
 
 // the two ioctls and the fields read here, from include/uapi/linux/fb.h
 FB_VSCREENINFO = 0x4600
@@ -322,8 +326,9 @@ fb_pixels_slot:
         ldp     fp, lr, [sp], 16
         ret
 
-// fb_border(): the whole screen in the border colour, a line at a time
-fb_border_alloc = -(16 + 32) & -16
+// fb_border(): the border colour around the picture, whole lines above and below it and the
+// two bands beside it, so the picture never shows the border colour while it is redrawn
+fb_border_alloc = -(16 + 64) & -16
 fb_border_dealloc = 0 - fb_border_alloc
         .balign 4
 fb_border:
@@ -331,6 +336,8 @@ fb_border:
         mov     fp, sp
         stp     x19, x20, [sp, 16]
         stp     x21, x22, [sp, 32]
+        stp     x23, x24, [sp, 48]
+        stp     x25, x26, [sp, 64]
         ldr     x9, =fb_pix
         ldr     w10, [x9, FB_BORDER_PIX]
         ldr     x9, =fb_xres
@@ -350,17 +357,47 @@ fb_border_px:
         ldr     fb_bh_r, [x9]
         ldr     x9, =fb_pitch
         ldr     fb_bp_r, [x9]
+        // the picture's rows and, in bytes, where the bands beside it end and start
+        ldr     x9, =fb_k
+        ldr     x9, [x9]
+        ldr     x10, =fb_oy
+        ldr     fb_bo_r, [x10]
+        mov     x11, LOG_H
+        madd    fb_be_r, x11, x9, fb_bo_r
+        ldr     x10, =fb_ox
+        ldr     x10, [x10]
+        mov     x11, FB_PIXEL
+        mul     fb_bl_r, x10, x11
+        mov     x12, LOG_W
+        madd    x10, x12, x9, x10
+        mul     fb_br_r, x10, x11
         mov     fb_by_r, 0
 fb_border_line:
         mul     x0, fb_by_r, fb_bp_r
         ldr     x1, =fb_line
+        cmp     fb_by_r, fb_bo_r
+        b.lt    fb_border_full
+        cmp     fb_by_r, fb_be_r
+        b.ge    fb_border_full
+        mov     x2, fb_bl_r
+        bl      fb_seek_write
+        mul     x0, fb_by_r, fb_bp_r
+        add     x0, x0, fb_br_r
+        ldr     x1, =fb_line
+        sub     x2, fb_bw_r, fb_br_r
+        bl      fb_seek_write
+        b       fb_border_next
+fb_border_full:
         mov     x2, fb_bw_r
         bl      fb_seek_write
+fb_border_next:
         add     fb_by_r, fb_by_r, 1
         cmp     fb_by_r, fb_bh_r
         b.lt    fb_border_line
         ldp     x19, x20, [sp, 16]
         ldp     x21, x22, [sp, 32]
+        ldp     x23, x24, [sp, 48]
+        ldp     x25, x26, [sp, 64]
         ldp     fp, lr, [sp], fb_border_dealloc
         ret
 
