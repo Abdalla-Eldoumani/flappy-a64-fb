@@ -125,6 +125,8 @@ fb_fail:
 
 // fb_seek_write(x0 = byte offset in the framebuffer, x1 = buf, x2 = len): one run of pixels;
 // a bench counts the bytes instead
+// shortcut: a failed seek or write is not reported, so a framebuffer that refuses pixels shows
+// nothing while the game plays on; check the results if a device ever does that
         .balign 4
 fb_seek_write:
         stp     fp, lr, [sp, fb_seek_write_alloc]!
@@ -209,7 +211,7 @@ present_open:
         mov     x10, 1
         str     x10, [x9]
 present_open_fit:
-        // the largest whole k that fits both ways, centred
+        // a whole k keeps every pixel of the game a square of the same size
         ldr     x9, =fb_xres
         ldr     x9, [x9]
         udiv    x10, x9, fb_w_r
@@ -432,7 +434,6 @@ present_frame:
 present_frame_go:
         ldr     x9, =fb_k
         ldr     fb_k_r, [x9]
-        // one display row as framebuffer pixels: each pixel k wide
         mov     x9, FB_ROW1
         mul     fb_len_r, x9, fb_k_r
         mov     fb_y_r, 0
@@ -469,7 +470,7 @@ present_frame_rep:
         b.ne    present_frame_px
         mov     fb_j_r, 0
 present_frame_line:
-        // screen row oy + y * k + j, from column ox
+        // the row is expanded once and written k times, one screen line each
         madd    x9, fb_y_r, fb_k_r, fb_j_r
         ldr     x10, =fb_oy
         ldr     x10, [x10]
