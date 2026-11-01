@@ -52,8 +52,8 @@ FB_SEEK_SET = 0
 FB_STDIN = 0
 FB_STDERR = 2
 FB_EXIT_NO_FB = 2
-// shortcut: k stops at 8 (a 1152 x 2048 picture) and the border is drawn 4096 pixels at a time;
-// raise them for a larger screen
+// shortcut: k stops at 8 (a 1152 x 2048 picture) and the border covers at most the first 4096
+// pixels of a line; raise both for a screen wider than that
 FB_K_MAX = 8
 FB_ROW_MAX = LOG_W * FB_K_MAX * FB_PIXEL
 FB_LINE_PX = 4096
@@ -357,7 +357,6 @@ fb_border_px:
         ldr     fb_bh_r, [x9]
         ldr     x9, =fb_pitch
         ldr     fb_bp_r, [x9]
-        // the picture's rows and, in bytes, where the bands beside it end and start
         ldr     x9, =fb_k
         ldr     x9, [x9]
         ldr     x10, =fb_oy
