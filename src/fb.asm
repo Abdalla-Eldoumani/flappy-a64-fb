@@ -99,8 +99,6 @@ fb_yres:    .skip   8
 fb_last:    .skip   8
 fb_full:    .skip   8
 fb_bframe:  .skip   8
-// the console mode last set, KD_TEXT until a picture is drawn
-fb_kd:      .skip   8
         .balign 8
         .global term_total
         .global term_bench
@@ -257,7 +255,10 @@ present_open_bad:
 
 // fb_mode(x0 = KD_TEXT or KD_GRAPHICS): the console's mode, so its text and cursor stay off the
 // picture while the game draws and come back when it stops; a bench draws nothing, so it
-// leaves the console alone. A failure only means stdin is not a virtual console.
+// leaves the console alone. A failure only means stdin is not a virtual console, and setting
+// the mode it already has does nothing.
+// shortcut: a game killed by a signal leaves the console in graphics mode, since the syscalls
+// the game may use have no sigaction; add a handler if that list ever grows
         .balign 4
 fb_mode:
         stp     fp, lr, [sp, -16]!
@@ -265,11 +266,6 @@ fb_mode:
         ldr     x9, =term_bench
         ldr     x9, [x9]
         cbnz    x9, fb_mode_done
-        ldr     x9, =fb_kd
-        ldr     x10, [x9]
-        cmp     x10, x0
-        b.eq    fb_mode_done
-        str     x0, [x9]
         mov     x2, x0
         mov     x0, FB_STDIN
         ldr     x1, =FB_KDSETMODE
