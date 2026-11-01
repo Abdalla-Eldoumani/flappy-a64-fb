@@ -93,6 +93,8 @@ fb_yres:    .skip   8
 fb_last:    .skip   8
 fb_full:    .skip   8
 fb_bframe:  .skip   8
+// the console mode last set, KD_TEXT until a picture is drawn
+fb_kd:      .skip   8
         .balign 8
         .global term_total
         .global term_bench
@@ -197,12 +199,6 @@ present_open:
         ldr     w10, [x9, FB_F_LINE]
         ldr     x11, =fb_pitch
         str     x10, [x11]
-        // a failure here only means stdin is not a virtual console; the picture still works
-        mov     x0, FB_STDIN
-        ldr     x1, =FB_KDSETMODE
-        mov     x2, FB_KD_GRAPHICS
-        mov     x8, SYS_IOCTL
-        svc     0
         ldr     x9, =fb_opened
         mov     x10, 1
         str     x10, [x9]
@@ -221,8 +217,7 @@ present_open_fit:
         csel    x10, x10, x12, lt
         ldr     x12, =fb_k
         str     x10, [x12]
-        mov     w0, 0
-        cbz     x10, present_open_done
+        cbz     x10, present_open_none
         mul     x12, fb_w_r, x10
         sub     x12, x9, x12
         lsr     x12, x12, 1
@@ -236,13 +231,45 @@ present_open_fit:
         ldr     x9, =fb_full
         mov     x10, 1
         str     x10, [x9]
+        mov     x0, FB_KD_GRAPHICS
+        bl      fb_mode
         mov     w0, 1
+        b       present_open_done
+present_open_none:
+        // the game shows why on the console, which must be text again to show it
+        mov     x0, FB_KD_TEXT
+        bl      fb_mode
+        mov     w0, 0
 present_open_done:
         ldp     x19, x20, [sp, 16]
         ldp     fp, lr, [sp], present_open_dealloc
         ret
 present_open_bad:
         bl      fb_fail
+
+// fb_mode(x0 = KD_TEXT or KD_GRAPHICS): the console's mode, so its text and cursor stay off the
+// picture while the game draws and come back when it stops; a bench draws nothing, so it
+// leaves the console alone. A failure only means stdin is not a virtual console.
+        .balign 4
+fb_mode:
+        stp     fp, lr, [sp, -16]!
+        mov     fp, sp
+        ldr     x9, =term_bench
+        ldr     x9, [x9]
+        cbnz    x9, fb_mode_done
+        ldr     x9, =fb_kd
+        ldr     x10, [x9]
+        cmp     x10, x0
+        b.eq    fb_mode_done
+        str     x0, [x9]
+        mov     x2, x0
+        mov     x0, FB_STDIN
+        ldr     x1, =FB_KDSETMODE
+        mov     x8, SYS_IOCTL
+        svc     0
+fb_mode_done:
+        ldp     fp, lr, [sp], 16
+        ret
 
 // fb_pixels(x0 = palette): each slot's R, G, B as a pixel in the framebuffer's own layout
 // shortcut: a channel keeps its top length bits, so channels wider than 8 bits come out
@@ -460,11 +487,8 @@ present_close:
         ldr     x10, [x9]
         cbz     x10, present_close_done
         str     xzr, [x9]
-        mov     x0, FB_STDIN
-        ldr     x1, =FB_KDSETMODE
-        mov     x2, FB_KD_TEXT
-        mov     x8, SYS_IOCTL
-        svc     0
+        mov     x0, FB_KD_TEXT
+        bl      fb_mode
         ldr     x9, =fb_fd
         ldr     x0, [x9]
         mov     x8, SYS_CLOSE
