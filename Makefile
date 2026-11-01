@@ -82,3 +82,4 @@ play: vm
 
 clean:
 	rm -rf build dist
+	$(MAKE) -C $(CORE) clean
