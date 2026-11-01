@@ -69,8 +69,9 @@ $(VM)/initramfs.cpio.gz: build/flappy-fb vm/fetch.sh vm/initramfs.sh vm/init
 vmcheck: vm build/flappy-ref
 	python3 tests/vm-check.py $(VM) build/flappy-ref $(RUN)
 
-# core's terminal build renders the reference frames
-build/flappy-ref: | build
+# core's terminal build renders the reference frames; it follows core's sources, so moving the
+# submodule rebuilds it
+build/flappy-ref: $(CSRC) $(CORE)/src/term.asm $(DEFS) | build
 	$(MAKE) -C $(CORE) build/flappy
 	cp $(CORE)/build/flappy $@
 
@@ -82,4 +83,4 @@ play: vm
 
 clean:
 	rm -rf build dist
-	$(MAKE) -C $(CORE) clean
+	if [ -f $(CORE)/Makefile ]; then $(MAKE) -C $(CORE) clean; fi
