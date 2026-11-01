@@ -41,6 +41,8 @@ FB_F_LINE = 48
 FB_BPP = 32
 FB_PIXEL = 4
 FB_CHANNEL_BITS = 8
+// the game's palette: red, green, blue and a spare byte for each slot
+FB_PAL_ENTRY = 4
 // the console's mode, from include/uapi/linux/kd.h: graphics keeps its text off the picture
 FB_KDSETMODE = 0x4B3A
 FB_KD_TEXT = 0
@@ -319,7 +321,7 @@ fb_pixels_slot:
         lsl     w13, w13, w14
         orr     w12, w12, w13
         str     w12, [x10], FB_PIXEL
-        add     x0, x0, FB_PIXEL
+        add     x0, x0, FB_PAL_ENTRY
         add     x11, x11, 1
         cmp     x11, SLOT_COUNT
         b.lt    fb_pixels_slot
